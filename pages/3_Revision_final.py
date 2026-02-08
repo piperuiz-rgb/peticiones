@@ -1,4 +1,5 @@
 # pages/3_Revision_final.py
+import re
 import streamlit as st
 from utils import init_state, ensure_style, load_repo_data, merge_carts
 
@@ -9,7 +10,7 @@ load_repo_data()
 
 st.markdown("# 3 · Revisión final")
 st.markdown(
-    "<div class='small'>Revisa el pedido final agrupado por referencia y ajusta cantidades antes de exportar.</div>",
+    "<div class='small'>Filtra por referencia/nombre y ajusta cantidades antes de exportar.</div>",
     unsafe_allow_html=True,
 )
 
@@ -17,13 +18,12 @@ if not st.session_state.get("cat_loaded"):
     st.error("No se encontró `catalogue.xlsx` en la raíz del repositorio.")
     st.stop()
 
-def set_qty_in_base_carts(ean: str, new_qty: int):
-    """
-    Mantiene la compatibilidad con tu modelo actual (2 carritos por debajo),
-    pero el usuario ve 1 revisión fusionada.
-    """
-    new_qty = int(new_qty)
+# Estado UI
+st.session_state.setdefault("rev_expand_all", True)
+st.session_state.setdefault("rev_filter", "")
 
+def set_qty_in_base_carts(ean: str, new_qty: int):
+    new_qty = int(new_qty)
     if new_qty <= 0:
         st.session_state.carrito_import.pop(ean, None)
         st.session_state.carrito_manual.pop(ean, None)
@@ -31,22 +31,21 @@ def set_qty_in_base_carts(ean: str, new_qty: int):
 
     if ean in st.session_state.carrito_import:
         st.session_state.carrito_import[ean]["Cantidad"] = new_qty
-        return
-
-    if ean in st.session_state.carrito_manual:
+    elif ean in st.session_state.carrito_manual:
         st.session_state.carrito_manual[ean]["Cantidad"] = new_qty
-        return
+    else:
+        # fallback raro
+        st.session_state.carrito_manual[ean] = {
+            "EAN": ean, "Ref": "", "Nom": "", "Col": "", "Tal": "", "Cantidad": new_qty
+        }
 
-    # Fallback improbable: si no está en ninguno, lo metemos en manual
-    # (esto evita inconsistencias en caso de estados raros)
-    st.session_state.carrito_manual[ean] = {
-        "EAN": ean,
-        "Ref": "",
-        "Nom": "",
-        "Col": "",
-        "Tal": "",
-        "Cantidad": new_qty,
-    }
+def delete_ref_in_base_carts(ref: str):
+    # borra en ambos carritos todas las líneas de esa referencia
+    for cart_key in ("carrito_import", "carrito_manual"):
+        cart = st.session_state.get(cart_key, {})
+        to_del = [ean for ean, it in cart.items() if (it.get("Ref") or "") == ref]
+        for ean in to_del:
+            cart.pop(ean, None)
 
 merged = merge_carts(st.session_state.carrito_import, st.session_state.carrito_manual)
 
@@ -56,7 +55,28 @@ if not merged:
     st.stop()
 
 # -----------------------------
-# Totales
+# Barra de herramientas (filtro + expand/collapse)
+# -----------------------------
+t1, t2, t3 = st.columns([2.2, 1.0, 1.0])
+with t1:
+    st.session_state.rev_filter = st.text_input(
+        "Buscar en revisión",
+        value=st.session_state.rev_filter,
+        placeholder="Ref, nombre, color, talla, EAN…",
+    )
+with t2:
+    if st.button("Expandir todo", use_container_width=True):
+        st.session_state.rev_expand_all = True
+        st.rerun()
+with t3:
+    if st.button("Colapsar todo", use_container_width=True):
+        st.session_state.rev_expand_all = False
+        st.rerun()
+
+q = (st.session_state.rev_filter or "").strip().lower()
+
+# -----------------------------
+# Totales (del pedido completo, no del filtro)
 # -----------------------------
 total_lines = len(merged)
 total_units = sum(int(v.get("Cantidad", 0)) for v in merged.values())
@@ -77,18 +97,46 @@ for ean, it in merged.items():
     ref = it.get("Ref", "") or "-"
     groups.setdefault(ref, []).append((ean, it))
 
-# Orden por referencia
+def group_matches(ref: str, items):
+    if not q:
+        return True
+    # match por ref, nombre, y cualquier variante
+    hay = []
+    hay.append(ref)
+    for ean, it in items:
+        hay.append(it.get("Nom", ""))
+        hay.append(it.get("Col", ""))
+        hay.append(it.get("Tal", ""))
+        hay.append(str(ean))
+    blob = " ".join(hay).lower()
+    return bool(re.search(re.escape(q), blob))
+
+shown_any = False
+
 for ref in sorted(groups.keys()):
     items = groups[ref]
-    # nombre “principal” (si hay)
+
+    if not group_matches(ref, items):
+        continue
+    shown_any = True
+
     name = next((it.get("Nom", "") for _, it in items if it.get("Nom")), "")
     units_ref = sum(int(it.get("Cantidad", 0)) for _, it in items)
     lines_ref = len(items)
 
+    # si hay filtro, expandimos por defecto para acelerar revisión
+    expanded = True if q else bool(st.session_state.rev_expand_all)
+
     title = f"{ref} · {lines_ref} líneas · {units_ref} uds"
-    with st.expander(title, expanded=True):
-        if name:
-            st.markdown(f"<div class='small'>{name}</div>", unsafe_allow_html=True)
+    with st.expander(title, expanded=expanded):
+        top = st.columns([3.0, 1.2])
+        with top[0]:
+            if name:
+                st.markdown(f"<div class='small'>{name}</div>", unsafe_allow_html=True)
+        with top[1]:
+            if st.button("Eliminar referencia", key=f"delref_{ref}", use_container_width=True):
+                delete_ref_in_base_carts(ref)
+                st.rerun()
 
         st.markdown("<div class='card'>", unsafe_allow_html=True)
 
@@ -98,13 +146,18 @@ for ref in sorted(groups.keys()):
         header[2].markdown("")
         header[3].markdown("")
 
-        # Orden por color/talla para lectura
         items_sorted = sorted(items, key=lambda x: (x[1].get("Col", ""), x[1].get("Tal", "")))
 
         for ean, it in items_sorted:
             col = it.get("Col", "-")
             tal = it.get("Tal", "-")
             qty = int(it.get("Cantidad", 0))
+
+            # si hay filtro, también filtramos a nivel variante
+            if q:
+                vblob = f"{ref} {it.get('Nom','')} {col} {tal} {ean}".lower()
+                if q not in vblob:
+                    continue
 
             row = st.columns([3.8, 1.0, 0.6, 0.6])
 
@@ -129,6 +182,9 @@ for ref in sorted(groups.keys()):
                     st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+if not shown_any:
+    st.info("No hay resultados para ese filtro.")
 
 st.markdown("<hr/>", unsafe_allow_html=True)
 st.page_link("pages/4_Exportar.py", label="Confirmar y exportar →", use_container_width=True)
