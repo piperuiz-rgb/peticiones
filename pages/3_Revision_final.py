@@ -1,6 +1,11 @@
 # pages/3_Revision_final.py
 import streamlit as st
-from utils import init_state, ensure_style, load_repo_data, cart_to_df, merge_carts
+from utils import (
+    init_state,
+    ensure_style,
+    load_repo_data,
+    merge_carts,
+)
 
 st.set_page_config(page_title="Revisión", page_icon="🧾", layout="wide")
 ensure_style()
@@ -8,72 +13,72 @@ init_state()
 load_repo_data()
 
 st.markdown("# 3 · Revisión final")
-st.markdown("<div class='small'>Revisa el carrito importado y el manual por separado. La fusión es lo que se exporta.</div>", unsafe_allow_html=True)
+st.markdown(
+    "<div class='small'>Revisa y ajusta las cantidades finales antes de exportar.</div>",
+    unsafe_allow_html=True,
+)
 
 if not st.session_state.get("cat_loaded"):
     st.error("No se encontró `catalogue.xlsx` en la raíz del repositorio.")
     st.stop()
 
-car_imp_df = cart_to_df(st.session_state.carrito_import)
-car_man_df = cart_to_df(st.session_state.carrito_manual)
-car_merge = merge_carts(st.session_state.carrito_import, st.session_state.carrito_manual)
-
-car_merge_df = cart_to_df(car_merge)[["EAN", "Ref", "Nom", "Col", "Tal", "Cantidad"]].rename(
-    columns={"Ref": "Referencia", "Nom": "Nombre", "Col": "Color", "Tal": "Talla"}
+# Fusión de carritos (estado único para revisión)
+merged = merge_carts(
+    st.session_state.carrito_import,
+    st.session_state.carrito_manual,
 )
 
-def apply_edited_cart(edited):
-    new_cart = {}
-    for _, r in edited.iterrows():
-        ean = str(r["EAN"])
-        qty = int(r["Cantidad"])
-        if qty > 0:
-            new_cart[ean] = {
-                "EAN": ean,
-                "Ref": str(r["Referencia"]),
-                "Nom": str(r["Nombre"]),
-                "Col": str(r["Color"]),
-                "Tal": str(r["Talla"]),
-                "Cantidad": qty,
-            }
-    return new_cart
+if not merged:
+    st.info("No hay prendas en la petición todavía.")
+    st.page_link("pages/2_Seleccion_manual.py", label="← Volver a selección manual", use_container_width=True)
+    st.stop()
 
-cA, cB, cC = st.columns(3)
+st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-with cA:
-    st.markdown("<div class='card'><b>Carrito importado</b></div>", unsafe_allow_html=True)
-    st.caption(f"{len(car_imp_df)} líneas")
-    if car_imp_df.empty:
-        st.info("Vacío.")
-    else:
-        edit_df = car_imp_df.rename(columns={"Ref": "Referencia", "Nom": "Nombre", "Col": "Color", "Tal": "Talla"})
-        edited = st.data_editor(edit_df, use_container_width=True, hide_index=True,
-                                disabled=["EAN","Referencia","Nombre","Color","Talla"])
-        st.session_state.carrito_import = apply_edited_cart(edited)
+header = st.columns([3.5, 1.2, 0.6, 0.6])
+header[0].markdown("**Prenda**")
+header[1].markdown("**Cantidad**")
+header[2].markdown("")
+header[3].markdown("")
 
-with cB:
-    st.markdown("<div class='card'><b>Carrito manual</b></div>", unsafe_allow_html=True)
-    st.caption(f"{len(car_man_df)} líneas")
-    if car_man_df.empty:
-        st.info("Vacío.")
-    else:
-        edit_df = car_man_df.rename(columns={"Ref": "Referencia", "Nom": "Nombre", "Col": "Color", "Tal": "Talla"})
-        edited = st.data_editor(edit_df, use_container_width=True, hide_index=True,
-                                disabled=["EAN","Referencia","Nombre","Color","Talla"])
-        st.session_state.carrito_manual = apply_edited_cart(edited)
+for ean, item in list(merged.items()):
+    row = st.columns([3.5, 1.2, 0.6, 0.6])
 
-with cC:
-    st.markdown("<div class='card'><b>Fusión (se exporta)</b></div>", unsafe_allow_html=True)
-    st.caption(f"{len(car_merge_df)} líneas")
-    if car_merge_df.empty:
-        st.info("No hay líneas para exportar.")
-    else:
-        st.dataframe(car_merge_df, use_container_width=True, hide_index=True)
+    with row[0]:
+        st.markdown(
+            f"<strong>{item['Ref']}</strong><br>"
+            f"<span class='small'>{item['Nom']} ({item['Col']} / {item['Tal']})</span>",
+            unsafe_allow_html=True,
+        )
 
-from utils import nav_buttons
+    with row[1]:
+        st.markdown(f"<div class='cellqty'>{item['Cantidad']}</div>", unsafe_allow_html=True)
 
-nav_buttons(
-    prev_page="pages/2_Seleccion_manual.py",
-    next_page="pages/4_Exportar.py",
-    next_label="Confirmar revisión y exportar →"
-)
+    with row[2]:
+        if st.button("−", key=f"rev_minus_{ean}", use_container_width=True):
+            item["Cantidad"] -= 1
+            if item["Cantidad"] <= 0:
+                st.session_state.carrito_import.pop(ean, None)
+                st.session_state.carrito_manual.pop(ean, None)
+            else:
+                # reflejar en uno de los carritos base
+                if ean in st.session_state.carrito_import:
+                    st.session_state.carrito_import[ean]["Cantidad"] = item["Cantidad"]
+                elif ean in st.session_state.carrito_manual:
+                    st.session_state.carrito_manual[ean]["Cantidad"] = item["Cantidad"]
+            st.rerun()
+
+    with row[3]:
+        if st.button("＋", key=f"rev_plus_{ean}", use_container_width=True):
+            item["Cantidad"] += 1
+            if ean in st.session_state.carrito_import:
+                st.session_state.carrito_import[ean]["Cantidad"] = item["Cantidad"]
+            elif ean in st.session_state.carrito_manual:
+                st.session_state.carrito_manual[ean]["Cantidad"] = item["Cantidad"]
+            st.rerun()
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<hr/>", unsafe_allow_html=True)
+st.page_link("pages/4_Exportar.py", label="Confirmar y exportar →", use_container_width=True)
+st.page_link("pages/2_Seleccion_manual.py", label="← Volver a selección manual", use_container_width=True)
