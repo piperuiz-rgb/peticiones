@@ -72,7 +72,6 @@ except Exception as e:
     st.error(f"Error exportando: {e}")
     from utils import nav_buttons
 
-nav_buttons(
-    prev_page="pages/3_Revision_final.py",
-    next_page=None
-)
+st.markdown("<hr/>", unsafe_allow_html=True)
+st.page_link("pages/3_Revision_final.py", label="← Volver a revisión", use_container_width=True)
+st.page_link("app.py", label="Nueva petición (inicio) →", use_container_width=True)
