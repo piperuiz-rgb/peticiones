@@ -37,23 +37,32 @@ with c2:
             st.session_state.pending_rows = []
 
 if petition_file is None:
+    if petition_file is None:
     st.info("No has subido fichero. Este paso es opcional — puedes continuar a **2 · Selección manual**.")
 else:
-    if st.button("Procesar importación", type="primary"):
-        pet_df = read_petition_excel(petition_file.getvalue())
-        matched, pending = match_petition_to_catalog(pet_df, idx_exact, idx_ref_color, idx_ref_talla, idx_ref)
+    file_id = f"{petition_file.name}:{petition_file.size}"
+    if st.session_state.import_done_for != file_id:
+        with st.spinner("Procesando importación…"):
+            pet_df = read_petition_excel(petition_file.getvalue())
+            matched, pending = match_petition_to_catalog(
+                pet_df, idx_exact, idx_ref_color, idx_ref_talla, idx_ref
+            )
 
-        added_lines = 0
-        for m in matched:
-            add_to_cart(st.session_state.carrito_import, m, int(m["Cantidad"]))
-            added_lines += 1
+            added_lines = 0
+            for m in matched:
+                add_to_cart(st.session_state.carrito_import, m, int(m["Cantidad"]))
+                added_lines += 1
 
-        st.session_state.pending_rows = pending
-        st.session_state.last_import_stats = {
-            "matched_lines": len(matched),
-            "pending_lines": len(pending),
-            "added_lines": added_lines,
-        }
+            st.session_state.pending_rows = pending
+            st.session_state.last_import_stats = {
+                "matched_lines": len(matched),
+                "pending_lines": len(pending),
+                "added_lines": added_lines,
+            }
+
+            st.session_state.import_done_for = file_id
+
+        st.success("Importación aplicada.")
 
 if st.session_state.last_import_stats:
     s = st.session_state.last_import_stats
