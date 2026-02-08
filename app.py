@@ -7,7 +7,7 @@ ensure_style()
 init_state()
 load_repo_data()
 
-st.markdown("#0 · Datos del pedido")
+st.markdown("# 0 · Datos del pedido")
 st.markdown("<div class='small'>Catálogo y plantilla se cargan automáticamente desde el repositorio.</div>", unsafe_allow_html=True)
 
 if not st.session_state.get("cat_loaded"):
