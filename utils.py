@@ -377,12 +377,10 @@ def export_to_template_xlsx(df_lines: pd.DataFrame, fecha: date, origen: str, de
 def nav_buttons(prev_page: str | None, next_page: str | None, next_label: str = "Confirmar y continuar →"):
     c1, c2 = st.columns(2)
 
-    if prev_page:
-        with c1:
-            if st.button("← Volver", use_container_width=True):
-                st.switch_page(prev_page)
+    with c1:
+        if prev_page:
+            st.page_link(prev_page, label="← Volver", use_container_width=True)
 
-    if next_page:
-        with c2:
-            if st.button(next_label, type="primary", use_container_width=True):
-                st.switch_page(next_page)
+    with c2:
+        if next_page:
+            st.page_link(next_page, label=next_label, use_container_width=True)
