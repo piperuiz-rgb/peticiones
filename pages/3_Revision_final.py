@@ -14,6 +14,23 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Sticky bar CSS
+st.markdown(
+    """
+<style>
+.stickybar {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  background: white;
+  border-bottom: 1px solid #eee;
+  padding: 10px 0 12px 0;
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
 if not st.session_state.get("cat_loaded"):
     st.error("No se encontró `catalogue.xlsx` en la raíz del repositorio.")
     st.stop()
@@ -40,7 +57,6 @@ def set_qty_in_base_carts(ean: str, new_qty: int):
         }
 
 def delete_ref_in_base_carts(ref: str):
-    # borra en ambos carritos todas las líneas de esa referencia
     for cart_key in ("carrito_import", "carrito_manual"):
         cart = st.session_state.get(cart_key, {})
         to_del = [ean for ean, it in cart.items() if (it.get("Ref") or "") == ref]
@@ -76,16 +92,20 @@ with t3:
 q = (st.session_state.rev_filter or "").strip().lower()
 
 # -----------------------------
-# Totales (del pedido completo, no del filtro)
+# Totales (del pedido completo, no del filtro) + Sticky bar
 # -----------------------------
 total_lines = len(merged)
 total_units = sum(int(v.get("Cantidad", 0)) for v in merged.values())
 total_refs = len(set(v.get("Ref", "") for v in merged.values() if v.get("Ref", "")))
 
-m1, m2, m3 = st.columns(3)
+st.markdown("<div class='stickybar'>", unsafe_allow_html=True)
+m1, m2, m3, m4 = st.columns([1, 1, 1, 1.2])
 m1.metric("Referencias", total_refs)
 m2.metric("Líneas", total_lines)
 m3.metric("Unidades", total_units)
+with m4:
+    st.page_link("pages/4_Exportar.py", label="Exportar →", use_container_width=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<hr/>", unsafe_allow_html=True)
 
@@ -100,9 +120,7 @@ for ean, it in merged.items():
 def group_matches(ref: str, items):
     if not q:
         return True
-    # match por ref, nombre, y cualquier variante
-    hay = []
-    hay.append(ref)
+    hay = [ref]
     for ean, it in items:
         hay.append(it.get("Nom", ""))
         hay.append(it.get("Col", ""))
@@ -124,7 +142,6 @@ for ref in sorted(groups.keys()):
     units_ref = sum(int(it.get("Cantidad", 0)) for _, it in items)
     lines_ref = len(items)
 
-    # si hay filtro, expandimos por defecto para acelerar revisión
     expanded = True if q else bool(st.session_state.rev_expand_all)
 
     title = f"{ref} · {lines_ref} líneas · {units_ref} uds"
@@ -153,7 +170,6 @@ for ref in sorted(groups.keys()):
             tal = it.get("Tal", "-")
             qty = int(it.get("Cantidad", 0))
 
-            # si hay filtro, también filtramos a nivel variante
             if q:
                 vblob = f"{ref} {it.get('Nom','')} {col} {tal} {ean}".lower()
                 if q not in vblob:
