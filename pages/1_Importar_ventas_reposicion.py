@@ -10,6 +10,7 @@ st.set_page_config(page_title="Importar ventas/reposición", page_icon="📤", l
 ensure_style()
 init_state()
 load_repo_data()
+st.session_state.setdefault("import_done_for", "")
 
 st.markdown("# 1 · Importar ventas/reposición (opcional)")
 st.markdown("<div class='small'>Sube el Excel de ventas/reposición para precargar el <b>carrito importado</b>. Si no lo subes, puedes añadir todo manualmente.</div>", unsafe_allow_html=True)
