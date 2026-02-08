@@ -373,3 +373,16 @@ def export_to_template_xlsx(df_lines: pd.DataFrame, fecha: date, origen: str, de
     bio = io.BytesIO()
     wb.save(bio)
     return bio.getvalue()
+
+def nav_buttons(prev_page: str | None, next_page: str | None, next_label: str = "Confirmar y continuar →"):
+    c1, c2 = st.columns(2)
+
+    if prev_page:
+        with c1:
+            if st.button("← Volver", use_container_width=True):
+                st.switch_page(prev_page)
+
+    if next_page:
+        with c2:
+            if st.button(next_label, type="primary", use_container_width=True):
+                st.switch_page(next_page)
