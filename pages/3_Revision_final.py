@@ -10,7 +10,7 @@ load_repo_data()
 
 st.markdown("# 3 · Revisión final")
 st.markdown(
-    "<div class='small'>Filtra por referencia/nombre y ajusta cantidades antes de exportar.</div>",
+    "<div class='small'>Filtra y ajusta cantidades finales antes de exportar.</div>",
     unsafe_allow_html=True,
 )
 
@@ -40,7 +40,12 @@ st.session_state.setdefault("rev_expand_all", True)
 st.session_state.setdefault("rev_filter", "")
 
 def set_qty_in_base_carts(ean: str, new_qty: int):
+    """
+    Mantiene compatibilidad con el modelo actual (carrito_import + carrito_manual),
+    pero el usuario ve 1 revisión fusionada.
+    """
     new_qty = int(new_qty)
+
     if new_qty <= 0:
         st.session_state.carrito_import.pop(ean, None)
         st.session_state.carrito_manual.pop(ean, None)
@@ -51,17 +56,15 @@ def set_qty_in_base_carts(ean: str, new_qty: int):
     elif ean in st.session_state.carrito_manual:
         st.session_state.carrito_manual[ean]["Cantidad"] = new_qty
     else:
-        # fallback raro
+        # fallback raro: si no está en ninguno, lo metemos en manual
         st.session_state.carrito_manual[ean] = {
-            "EAN": ean, "Ref": "", "Nom": "", "Col": "", "Tal": "", "Cantidad": new_qty
+            "EAN": ean,
+            "Ref": "",
+            "Nom": "",
+            "Col": "",
+            "Tal": "",
+            "Cantidad": new_qty,
         }
-
-def delete_ref_in_base_carts(ref: str):
-    for cart_key in ("carrito_import", "carrito_manual"):
-        cart = st.session_state.get(cart_key, {})
-        to_del = [ean for ean, it in cart.items() if (it.get("Ref") or "") == ref]
-        for ean in to_del:
-            cart.pop(ean, None)
 
 merged = merge_carts(st.session_state.carrito_import, st.session_state.carrito_manual)
 
@@ -71,7 +74,7 @@ if not merged:
     st.stop()
 
 # -----------------------------
-# Barra de herramientas (filtro + expand/collapse)
+# Barra herramientas (filtro + expand/collapse)
 # -----------------------------
 t1, t2, t3 = st.columns([2.2, 1.0, 1.0])
 with t1:
@@ -92,7 +95,7 @@ with t3:
 q = (st.session_state.rev_filter or "").strip().lower()
 
 # -----------------------------
-# Totales (del pedido completo, no del filtro) + Sticky bar
+# Totales + sticky bar
 # -----------------------------
 total_lines = len(merged)
 total_units = sum(int(v.get("Cantidad", 0)) for v in merged.values())
@@ -133,9 +136,9 @@ shown_any = False
 
 for ref in sorted(groups.keys()):
     items = groups[ref]
-
     if not group_matches(ref, items):
         continue
+
     shown_any = True
 
     name = next((it.get("Nom", "") for _, it in items if it.get("Nom")), "")
@@ -143,25 +146,21 @@ for ref in sorted(groups.keys()):
     lines_ref = len(items)
 
     expanded = True if q else bool(st.session_state.rev_expand_all)
-
     title = f"{ref} · {lines_ref} líneas · {units_ref} uds"
+
     with st.expander(title, expanded=expanded):
-        top = st.columns([3.0, 1.2])
-        with top[0]:
-            if name:
-                st.markdown(f"<div class='small'>{name}</div>", unsafe_allow_html=True)
-        with top[1]:
-            if st.button("Eliminar referencia", key=f"delref_{ref}", use_container_width=True):
-                delete_ref_in_base_carts(ref)
-                st.rerun()
+        if name:
+            st.markdown(f"<div class='small'>{name}</div>", unsafe_allow_html=True)
 
         st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-        header = st.columns([3.8, 1.0, 0.6, 0.6])
+        # Cabecera: Variante | Qty | - | + | 🗑️
+        header = st.columns([3.6, 0.9, 0.55, 0.55, 0.6])
         header[0].markdown("**Variante**")
         header[1].markdown("**Qty**")
         header[2].markdown("")
         header[3].markdown("")
+        header[4].markdown("")
 
         items_sorted = sorted(items, key=lambda x: (x[1].get("Col", ""), x[1].get("Tal", "")))
 
@@ -170,12 +169,13 @@ for ref in sorted(groups.keys()):
             tal = it.get("Tal", "-")
             qty = int(it.get("Cantidad", 0))
 
+            # Filtro a nivel variante (si hay query)
             if q:
                 vblob = f"{ref} {it.get('Nom','')} {col} {tal} {ean}".lower()
                 if q not in vblob:
                     continue
 
-            row = st.columns([3.8, 1.0, 0.6, 0.6])
+            row = st.columns([3.6, 0.9, 0.55, 0.55, 0.6])
 
             with row[0]:
                 st.markdown(
@@ -195,6 +195,12 @@ for ref in sorted(groups.keys()):
             with row[3]:
                 if st.button("＋", key=f"rev_plus_{ean}", use_container_width=True):
                     set_qty_in_base_carts(ean, qty + 1)
+                    st.rerun()
+
+            with row[4]:
+                # Eliminar variante de golpe
+                if st.button("🗑️", key=f"rev_del_{ean}", use_container_width=True):
+                    set_qty_in_base_carts(ean, 0)
                     st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
