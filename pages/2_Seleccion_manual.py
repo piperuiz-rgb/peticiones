@@ -111,3 +111,11 @@ if st.session_state.selected_ref:
                         st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+from utils import nav_buttons
+
+nav_buttons(
+    prev_page="pages/1_Importar_ventas_reposicion.py",
+    next_page="pages/3_Revision_final.py",
+    next_label="Revisar carritos →"
+)
