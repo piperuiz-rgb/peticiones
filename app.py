@@ -42,3 +42,11 @@ if st.session_state.get("tpl_bytes") is None:
     st.warning("No se encontró **plantilla_pedido.xlsx** en la raíz del repositorio. Podrás trabajar, pero no exportar.")
 
 st.info("Siguiente: ve a **1 · Importar ventas/reposición** en el menú de la izquierda (opcional).")
+
+from utils import nav_buttons
+
+nav_buttons(
+    prev_page=None,
+    next_page="pages/1_Importar_ventas_reposicion.py",
+    next_label="Confirmar datos y continuar →"
+)
