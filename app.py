@@ -29,6 +29,12 @@ with c3:
         DEST_OPTIONS,
         index=DEST_OPTIONS.index(st.session_state.destino) if st.session_state.destino in DEST_OPTIONS else 0,
     )
+    # Bloqueo: origen y destino no pueden coincidir
+if st.session_state.origen == st.session_state.destino:
+    st.warning("Origen y destino no pueden coincidir. Cambia uno de los dos para continuar.")
+    st.session_state["route_ok"] = False
+else:
+    st.session_state["route_ok"] = True
 with c4:
     st.session_state.ref_peticion = st.text_input(
         "Referencia de la petición (se exporta en Observaciones)",
