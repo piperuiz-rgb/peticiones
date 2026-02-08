@@ -40,9 +40,8 @@ TALLA_MAP = {
     "XXXL": "XXXL",
 }
 TALLA_REGEX = re.compile(r"^\\s*(XXS|XS|S|M|L|XL|XXL|XXXL|[0-9]{2,3}|[0-9]{1,2}[A-Z]?)\\s*$", re.I)
-REF_BRACKET_REGEX = re.compile(r"\\[(?P<ref>[^\\]]+)\\]")
-ATTR_PAREN_REGEX = re.compile(r"\\((?P<attrs>[^)]+)\\)\\s*$")
-
+REF_BRACKET_REGEX = re.compile(r"\[(?P<ref>[^\]]+)\]")
+ATTR_PAREN_REGEX = re.compile(r"\((?P<attrs>[^)]+)\)\s*$")
 
 def ensure_style():
     st.markdown(
