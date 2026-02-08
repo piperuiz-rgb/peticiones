@@ -67,3 +67,11 @@ if st.session_state.pending_rows:
 
 st.markdown("<hr/>", unsafe_allow_html=True)
 st.info("Siguiente: ve a **2 · Selección manual** para ajustar con el grid.")
+
+from utils import nav_buttons
+
+nav_buttons(
+    prev_page="app.py",
+    next_page="pages/2_Seleccion_manual.py",
+    next_label="Continuar a selección manual →"
+)
