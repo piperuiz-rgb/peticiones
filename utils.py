@@ -172,7 +172,6 @@ def load_repo_data():
         except Exception:
             st.session_state.tpl_bytes = None
 
-
 def build_catalog_indexes(cat: pd.DataFrame):
     idx_exact: Dict[Tuple[str, str, str], dict] = {}
     idx_ref_color: Dict[Tuple[str, str], List[dict]] = {}
