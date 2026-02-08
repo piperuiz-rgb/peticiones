@@ -16,7 +16,6 @@ ensure_style()
 init_state()
 load_repo_data()
 
-# Flag para evitar reimportar el mismo fichero en cada rerun
 st.session_state.setdefault("import_done_for", "")
 
 st.markdown("# 1 · Importar ventas/reposición (opcional)")
@@ -53,7 +52,7 @@ with c2:
         if st.button("Vaciar pendientes", use_container_width=True):
             st.session_state.pending_rows = []
 
-# Procesamiento AUTOMÁTICO al subir fichero (soluciona “solo carga a la segunda”)
+# Procesa automáticamente al subir el fichero
 if petition_file is None:
     st.info("No has subido fichero. Este paso es opcional — puedes continuar a **2 · Selección manual**.")
 else:
@@ -95,3 +94,4 @@ if st.session_state.get("pending_rows"):
 
 st.markdown("<hr/>", unsafe_allow_html=True)
 st.page_link("pages/2_Seleccion_manual.py", label="Continuar a selección manual →", use_container_width=True)
+st.page_link("app.py", label="← Volver a datos del pedido", use_container_width=True)
