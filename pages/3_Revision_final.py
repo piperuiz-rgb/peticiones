@@ -69,3 +69,11 @@ with cC:
         st.info("No hay líneas para exportar.")
     else:
         st.dataframe(car_merge_df, use_container_width=True, hide_index=True)
+
+from utils import nav_buttons
+
+nav_buttons(
+    prev_page="pages/2_Seleccion_manual.py",
+    next_page="pages/4_Exportar.py",
+    next_label="Confirmar revisión y exportar →"
+)
