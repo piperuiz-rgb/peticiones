@@ -70,3 +70,9 @@ try:
     )
 except Exception as e:
     st.error(f"Error exportando: {e}")
+    from utils import nav_buttons
+
+nav_buttons(
+    prev_page="pages/3_Revision_final.py",
+    next_page=None
+)
