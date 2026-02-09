@@ -19,19 +19,14 @@ load_repo_data()
 
 st.markdown("# 1 · Importar ventas/reposición (opcional)")
 st.markdown(
-    "<div class='small'>Sube el Excel para precargar el <b>carrito importado</b>. "
-    "En móvil, el archivo puede tardar 1–2 reruns en estar disponible; esta pantalla lo gestiona sola.</div>",
+    "<div class='small'>Si no funciona, primero confirmamos que el móvil está subiendo bytes reales y que el lector de Excel no falla.</div>",
     unsafe_allow_html=True,
 )
 
-# --- estado para upload robusto ---
-st.session_state.setdefault("petition_bytes", None)
-st.session_state.setdefault("petition_name", "")
-st.session_state.setdefault("petition_hash", "")
-st.session_state.setdefault("import_hash_done", "")
+st.session_state.setdefault("carrito_import", {})
 st.session_state.setdefault("pending_rows", [])
 st.session_state.setdefault("last_import_stats", None)
-st.session_state.setdefault("carrito_import", {})
+st.session_state.setdefault("import_hash_done", "")
 
 if not st.session_state.get("cat_loaded"):
     st.error("No se encontró `catalogue.xlsx` en la raíz del repositorio.")
@@ -40,91 +35,81 @@ if not st.session_state.get("cat_loaded"):
 cat = st.session_state.catalog_df
 idx_exact, idx_ref_color, idx_ref_talla, idx_ref = build_catalog_indexes(cat)
 
-def _capture_upload():
-    """Captura bytes del uploader en session_state al cambiar el archivo."""
-    uf = st.session_state.get("u_petition")
-    if uf is None:
-        st.session_state.petition_bytes = None
-        st.session_state.petition_name = ""
-        st.session_state.petition_hash = ""
-        return
+uf = st.file_uploader("Excel de ventas/reposición", type=["xlsx", "xls"], key="u_petition")
 
-    try:
-        b = uf.getvalue()
-    except Exception:
-        b = None
-
-    # Si en móvil llega vacío, no sobreescribimos por None; esperamos próximo rerun
-    if b and len(b) > 1000:
-        st.session_state.petition_bytes = b
-        st.session_state.petition_name = getattr(uf, "name", "") or ""
-        st.session_state.petition_hash = hashlib.sha256(b).hexdigest()
-
-def _process_bytes(b: bytes):
-    pet_df = read_petition_excel(b)
-    matched, pending = match_petition_to_catalog(pet_df, idx_exact, idx_ref_color, idx_ref_talla, idx_ref)
-
-    added_lines = 0
-    for m in matched:
-        # m debe traer EAN/Referencia/Nombre/Color/Talla/Cantidad según tu pipeline
-        add_to_cart(st.session_state.carrito_import, m, int(m["Cantidad"]))
-        added_lines += 1
-
-    st.session_state.pending_rows = pending
-    st.session_state.last_import_stats = {
-        "matched_lines": len(matched),
-        "pending_lines": len(pending),
-        "added_lines": added_lines,
-    }
-
-# --- UI ---
-top1, top2, top3 = st.columns([2.2, 1.1, 1.1])
-
-with top1:
-    st.file_uploader(
-        "Excel de ventas/reposición",
-        type=["xlsx", "xls"],
-        key="u_petition",
-        on_change=_capture_upload,
-    )
-
-with top2:
+colA, colB, colC = st.columns([1.2, 1.2, 1.6])
+with colA:
     if st.button("Vaciar carrito importado", use_container_width=True):
         st.session_state.carrito_import = {}
         st.session_state.last_import_stats = None
-
-with top3:
+        st.session_state.import_hash_done = ""
+with colB:
     if st.button("Vaciar pendientes", use_container_width=True):
         st.session_state.pending_rows = []
+with colC:
+    run_import = st.button("Procesar importación", type="primary", use_container_width=True)
 
-# En móvil, a veces on_change no captura a la primera: intentamos capturar también en cada rerun si hay uploader
-if st.session_state.get("petition_bytes") is None and st.session_state.get("u_petition") is not None:
-    _capture_upload()
+# --- Diagnóstico de subida ---
+if uf is None:
+    st.info("No has subido fichero. Este paso es opcional.")
+    st.markdown("<hr/>", unsafe_allow_html=True)
+    st.page_link("pages/2_Seleccion_manual.py", label="Continuar a 2 · Selección manual →", use_container_width=True)
+    st.page_link("app.py", label="← Volver a 0 · Datos del pedido", use_container_width=True)
+    st.stop()
 
-b = st.session_state.get("petition_bytes")
-h = st.session_state.get("petition_hash")
+# En móvil: usa buffer (más fiable que getvalue en algunos casos)
+try:
+    b = bytes(uf.getbuffer())
+except Exception:
+    # fallback
+    b = uf.getvalue()
 
-# Botón manual (respaldo)
-process_manual = st.button("Procesar importación", type="primary", use_container_width=True)
+st.caption(f"Archivo: **{getattr(uf, 'name', '')}** · Tamaño recibido: **{len(b)} bytes**")
 
-if b is None:
-    if st.session_state.get("u_petition") is None:
-        st.info("No has subido fichero. Este paso es opcional — puedes continuar a **2 · Selección manual**.")
+if len(b) < 2000:
+    st.warning(
+        "El fichero aún no ha llegado bien (bytes muy bajos). "
+        "En móvil: asegúrate de que el Excel está descargado localmente (no desde vista previa) y prueba de nuevo."
+    )
+
+# --- Lectura (preview) ---
+try:
+    pet_df = read_petition_excel(b)
+    st.success(f"Excel leído: {len(pet_df)} filas")
+    st.dataframe(pet_df.head(30), use_container_width=True, hide_index=True)
+except Exception as e:
+    st.error("Falla `read_petition_excel()` al leer el fichero. Error:")
+    st.exception(e)
+    st.markdown("<hr/>", unsafe_allow_html=True)
+    st.page_link("pages/2_Seleccion_manual.py", label="Continuar a 2 · Selección manual →", use_container_width=True)
+    st.page_link("app.py", label="← Volver a 0 · Datos del pedido", use_container_width=True)
+    st.stop()
+
+# --- Procesado (solo si pulsas botón) ---
+if run_import:
+    h = hashlib.sha256(b).hexdigest()
+    if st.session_state.import_hash_done == h:
+        st.info("Este fichero ya se procesó. Si quieres reprocesar, cambia el fichero o vacía carrito importado.")
     else:
-        st.warning("Archivo detectado, pero aún no está listo (móvil). Espera un momento o vuelve a pulsar Procesar.")
-else:
-    # Auto-procesa una sola vez por fichero (hash)
-    if h and st.session_state.import_hash_done != h:
-        with st.spinner("Procesando importación…"):
-            _process_bytes(b)
-            st.session_state.import_hash_done = h
-        st.success("Importación aplicada.")
-    elif process_manual:
-        with st.spinner("Reprocesando…"):
-            _process_bytes(b)
-        st.success("Reprocesado aplicado.")
+        try:
+            matched, pending = match_petition_to_catalog(pet_df, idx_exact, idx_ref_color, idx_ref_talla, idx_ref)
+            added_lines = 0
+            for m in matched:
+                add_to_cart(st.session_state.carrito_import, m, int(m["Cantidad"]))
+                added_lines += 1
 
-# Stats
+            st.session_state.pending_rows = pending
+            st.session_state.last_import_stats = {
+                "matched_lines": len(matched),
+                "pending_lines": len(pending),
+                "added_lines": added_lines,
+            }
+            st.session_state.import_hash_done = h
+            st.success("Importación aplicada.")
+        except Exception as e:
+            st.error("Falla el matcheo / carga en carrito. Error:")
+            st.exception(e)
+
 if st.session_state.get("last_import_stats"):
     s = st.session_state.last_import_stats
     m1, m2, m3 = st.columns(3)
@@ -132,7 +117,6 @@ if st.session_state.get("last_import_stats"):
     m2.metric("Pendientes", s["pending_lines"])
     m3.metric("Líneas añadidas", s["added_lines"])
 
-# Pendientes
 if st.session_state.get("pending_rows"):
     st.markdown("### Pendientes")
     st.dataframe(pd.DataFrame(st.session_state.pending_rows), use_container_width=True, hide_index=True)
