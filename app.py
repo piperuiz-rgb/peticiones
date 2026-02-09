@@ -1,10 +1,6 @@
 # app.py
 import streamlit as st
-from utils import (
-    init_state,
-    ensure_style,
-    load_repo_data,
-)
+from utils import init_state, ensure_style, load_repo_data
 
 st.set_page_config(page_title="Peticiones almacenes", page_icon="📦", layout="wide")
 ensure_style()
@@ -22,7 +18,7 @@ if not st.session_state.get("cat_loaded"):
     st.error("No se encontró **catalogue.xlsx** en la raíz del repositorio (o tiene columnas incorrectas).")
     st.stop()
 
-# ✅ Lista cerrada definitiva (solo nombres PET)
+# Lista cerrada definitiva (solo nombres PET)
 PET_OPTIONS = [
     "PET Almacén Badalona",
     "PET Almacén Ibiza",
@@ -45,15 +41,14 @@ def normalize_pet(v: str) -> str:
         return SHORT_TO_PET[v]
     return v if v in PET_OPTIONS else PET_OPTIONS[0]
 
-# Formulario de cabecera
+# Asegura valores antes de pintar selectbox
+st.session_state["origen"] = normalize_pet(st.session_state.get("origen", PET_OPTIONS[0]))
+st.session_state["destino"] = normalize_pet(st.session_state.get("destino", PET_OPTIONS[1]))
+
 c1, c2, c3, c4 = st.columns([1.2, 1.6, 1.6, 2.0])
 
 with c1:
     st.session_state.fecha = st.date_input("Fecha", value=st.session_state.fecha)
-
-# Aseguramos que session_state ya esté en PET antes de pintar selectbox
-st.session_state["origen"] = normalize_pet(st.session_state.get("origen", PET_OPTIONS[0]))
-st.session_state["destino"] = normalize_pet(st.session_state.get("destino", PET_OPTIONS[1]))
 
 with c2:
     st.session_state.origen = st.selectbox(
@@ -88,13 +83,13 @@ if st.session_state.get("tpl_bytes") is None:
     st.warning("No se encontró **plantilla_pedido.xlsx** en la raíz del repositorio. Podrás trabajar, pero no exportar.")
 
 st.markdown("### Siguiente paso")
-st.page_link(
-    "pages/1_Importar_ventas_reposicion.py",
-    label="Continuar a 1 · Importar ventas/reposición →",
-    use_container_width=True,
-)
-st.page_link(
-    "pages/2_Seleccion_manual.py",
-    label="Saltar importación y pasar a 2 · Selección manual →",
-    use_container_width=True,
-)
+
+# ✅ Navegación robusta en móvil (no page_link)
+b1, b2 = st.columns([1, 1])
+with b1:
+    if st.button("Continuar a 1 · Importar ventas/reposición →", use_container_width=True, type="primary"):
+        st.switch_page("pages/1_Importar_ventas_reposicion.py")
+
+with b2:
+    if st.button("Saltar importación y pasar a 2 · Selección manual →", use_container_width=True):
+        st.switch_page("pages/2_Seleccion_manual.py")
