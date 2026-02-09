@@ -1,6 +1,7 @@
 # pages/2_Seleccion_manual.py
 import re
 import streamlit as st
+import pandas as pd
 from utils import init_state, ensure_style, load_repo_data, add_to_cart
 
 st.set_page_config(page_title="Selección manual", page_icon="🔎", layout="wide")
@@ -8,7 +9,7 @@ ensure_style()
 init_state()
 load_repo_data()
 
-# CSS adicional para que el grid se perciba como tabla + cabecera sticky
+# CSS adicional para que el grid se perciba como tabla + cabecera sticky + panel carrito
 st.markdown(
     """
 <style>
@@ -21,8 +22,8 @@ st.markdown(
   margin-bottom: 8px;
 
   position: sticky;
-  top: 0;            /* se queda pegada arriba al hacer scroll */
-  z-index: 50;       /* por encima del resto del grid */
+  top: 0;
+  z-index: 50;
   box-shadow: 0 6px 14px rgba(0,0,0,0.04);
 }
 
@@ -58,6 +59,14 @@ st.markdown(
 .grid-colcell button[kind="secondary"] {
   font-size: 18px;
   font-weight: 800;
+}
+
+/* Panel carrito */
+.cartpanel {
+  border: 1px solid #eee;
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px 10px;
 }
 </style>
 """,
@@ -99,7 +108,6 @@ if q:
 else:
     hits = cat.loc[:, ["Referencia", "Nombre", "Color", "Talla", "EAN"]].head(0)
 
-# Para selector, deduplicamos por referencia+nombre
 hits = hits.drop_duplicates(subset=["Referencia", "Nombre"]).head(show_limit)
 
 ref_options = sorted(hits["Referencia"].dropna().astype(str).unique().tolist())
@@ -143,7 +151,6 @@ if st.session_state.selected_ref:
     colors = sorted(ref_df["Color"].dropna().astype(str).unique().tolist())
     tallas = sorted(ref_df["Talla"].dropna().astype(str).unique().tolist(), key=lambda x: (len(x), x))
 
-    # Mapa de variantes
     var_map = {}
     for _, r in ref_df.iterrows():
         var_map[(str(r["Color"]), str(r["Talla"]))] = {
@@ -194,6 +201,84 @@ if st.session_state.selected_ref:
 
             row_cols[j].markdown("</div>", unsafe_allow_html=True)
 
+# -----------------------------
+# Panel: Carrito manual (visible en la misma página)
+# -----------------------------
 st.markdown("<hr/>", unsafe_allow_html=True)
+
+carrito = st.session_state.get("carrito_manual", {}) or {}
+total_lines = len(carrito)
+total_units = sum(int(v.get("Cantidad", 0)) for v in carrito.values())
+
+with st.expander(f"Carrito manual · {total_lines} líneas · {total_units} uds", expanded=True):
+    st.markdown("<div class='cartpanel'>", unsafe_allow_html=True)
+
+    if not carrito:
+        st.info("Aún no has añadido prendas al carrito manual.")
+    else:
+        # Si hay referencia seleccionada, damos una sub-vista filtrable por esa ref
+        selected_ref = st.session_state.get("selected_ref", "")
+        show_only_ref = st.checkbox(
+            "Mostrar solo la referencia seleccionada",
+            value=bool(selected_ref),
+            disabled=not bool(selected_ref),
+        )
+
+        items = []
+        for ean, it in carrito.items():
+            if show_only_ref and selected_ref and it.get("Ref") != selected_ref:
+                continue
+            items.append((ean, it))
+
+        if not items:
+            st.info("No hay líneas del carrito manual para esa referencia.")
+        else:
+            # Cabecera
+            h = st.columns([2.4, 1.2, 1.0, 0.6, 0.6, 0.6])
+            h[0].markdown("**Ref / Producto**")
+            h[1].markdown("**Color / Talla**")
+            h[2].markdown("**Qty**")
+            h[3].markdown("")
+            h[4].markdown("")
+            h[5].markdown("")
+
+            # Orden: ref, color, talla
+            items_sorted = sorted(items, key=lambda x: (x[1].get("Ref", ""), x[1].get("Col", ""), x[1].get("Tal", "")))
+
+            for ean, it in items_sorted:
+                ref = it.get("Ref", "")
+                nom = it.get("Nom", "")
+                col = it.get("Col", "-")
+                tal = it.get("Tal", "-")
+                qty = int(it.get("Cantidad", 0))
+
+                row = st.columns([2.4, 1.2, 1.0, 0.6, 0.6, 0.6])
+
+                with row[0]:
+                    st.markdown(f"**{ref}**<br><span class='small'>{nom}</span>", unsafe_allow_html=True)
+                with row[1]:
+                    st.markdown(f"<span class='mono'>{col}</span> / <span class='mono'>{tal}</span>", unsafe_allow_html=True)
+                with row[2]:
+                    st.markdown(f"<div class='cellqty'>{qty}</div>", unsafe_allow_html=True)
+
+                # Para ajustar aquí sin depender de catálogo: usamos add_to_cart con dict mínimo
+                variant = {"EAN": ean, "Referencia": ref, "Nombre": nom, "Color": col, "Talla": tal}
+
+                with row[3]:
+                    if st.button("−", key=f"cart_minus_{ean}", use_container_width=True):
+                        add_to_cart(st.session_state.carrito_manual, variant, -1)
+                        st.rerun()
+                with row[4]:
+                    if st.button("＋", key=f"cart_plus_{ean}", use_container_width=True):
+                        add_to_cart(st.session_state.carrito_manual, variant, +1)
+                        st.rerun()
+                with row[5]:
+                    if st.button("🗑️", key=f"cart_del_{ean}", use_container_width=True):
+                        # eliminar de golpe
+                        st.session_state.carrito_manual.pop(ean, None)
+                        st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
 st.page_link("pages/3_Revision_final.py", label="Continuar a 3 · Revisión final →", use_container_width=True)
 st.page_link("pages/1_Importar_ventas_reposicion.py", label="← Volver a 1 · Importar", use_container_width=True)
