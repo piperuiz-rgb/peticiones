@@ -8,17 +8,22 @@ ensure_style()
 init_state()
 load_repo_data()
 
-# CSS adicional para que el grid se perciba como tabla
+# CSS adicional para que el grid se perciba como tabla + cabecera sticky
 st.markdown(
     """
 <style>
-/* Cabecera tipo tabla */
+/* Cabecera tipo tabla + STICKY */
 .grid-header-row {
   background: #fafafa;
   border: 1px solid #eee;
   padding: 8px 8px;
   border-radius: 10px;
   margin-bottom: 8px;
+
+  position: sticky;
+  top: 0;            /* se queda pegada arriba al hacer scroll */
+  z-index: 50;       /* por encima del resto del grid */
+  box-shadow: 0 6px 14px rgba(0,0,0,0.04);
 }
 
 /* Celda de cabecera (color) */
@@ -149,9 +154,7 @@ if st.session_state.selected_ref:
             "Talla": str(r["Talla"]),
         }
 
-    st.markdown("<div class='gridwrap'>", unsafe_allow_html=True)
-
-    # Cabecera (tipo tabla)
+    # Cabecera (tipo tabla) — sticky por CSS
     header_cols = st.columns([1.2] + [1.0] * len(colors))
     header_cols[0].markdown("<div class='grid-header-row grid-hdr-left'>Talla \\ Color</div>", unsafe_allow_html=True)
     for j, col in enumerate(colors, start=1):
@@ -175,7 +178,6 @@ if st.session_state.selected_ref:
             ean = variant["EAN"]
             current_qty = int(st.session_state.carrito_manual.get(ean, {}).get("Cantidad", 0))
 
-            # Wrapper visual de celda (columna de color)
             row_cols[j].markdown("<div class='grid-colcell'>", unsafe_allow_html=True)
 
             b1, b2, b3 = row_cols[j].columns([1, 1, 1])
@@ -191,8 +193,6 @@ if st.session_state.selected_ref:
                     st.rerun()
 
             row_cols[j].markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<hr/>", unsafe_allow_html=True)
 st.page_link("pages/3_Revision_final.py", label="Continuar a 3 · Revisión final →", use_container_width=True)
