@@ -2,8 +2,13 @@
 import streamlit as st
 import pandas as pd
 from utils import (
-    init_state, ensure_style, load_repo_data, read_petition_excel,
-    build_catalog_indexes, match_petition_to_catalog, add_to_cart
+    init_state,
+    ensure_style,
+    load_repo_data,
+    read_petition_excel,
+    build_catalog_indexes,
+    match_petition_to_catalog,
+    add_to_cart,
 )
 
 st.set_page_config(page_title="Importar ventas/reposición", page_icon="📤", layout="wide")
@@ -15,10 +20,10 @@ st.markdown("# 1 · Importar ventas/reposición (opcional)")
 st.markdown(
     "<div class='small'>Sube el Excel de ventas/reposición para precargar el <b>carrito importado</b>. "
     "Si no lo subes, puedes añadir todo manualmente.</div>",
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
-# Defaults seguros (no tocamos keys del uploader)
+# Estado mínimo
 st.session_state.setdefault("carrito_import", {})
 st.session_state.setdefault("pending_rows", [])
 st.session_state.setdefault("last_import_stats", None)
@@ -31,15 +36,22 @@ cat = st.session_state.catalog_df
 idx_exact, idx_ref_color, idx_ref_talla, idx_ref = build_catalog_indexes(cat)
 
 c1, c2 = st.columns([2.2, 1.0])
+
 with c1:
     petition_file = st.file_uploader(
         "Excel de ventas/reposición",
         type=["xlsx", "xls"],
-        key="u_petition_import",  # <- CLAVE ÚNICA
+        key="u_petition_import",  # ✅ KEY NUEVA Y ÚNICA
     )
-    # Diagnóstico UI: si se selecciona, aquí DEBE verse el nombre
+
+    # ✅ Diagnóstico inmediato: si se selecciona, aquí DEBE aparecer el nombre
     if petition_file is not None:
         st.caption(f"Seleccionado: **{petition_file.name}**")
+        try:
+            raw = petition_file.getvalue()
+        except Exception:
+            raw = bytes(petition_file.getbuffer())
+        st.caption(f"Bytes recibidos: **{len(raw)}**")
 
 with c2:
     a, b = st.columns(2)
@@ -56,13 +68,31 @@ if petition_file is None:
     st.info("No has subido fichero. Este paso es opcional — puedes continuar a **2 · Selección manual**.")
 else:
     if st.button("Procesar importación", type="primary"):
-        raw = petition_file.getvalue()
-        st.caption(f"Bytes recibidos: **{len(raw)}**")
+        try:
+            raw = petition_file.getvalue()
+        except Exception:
+            raw = bytes(petition_file.getbuffer())
+
         if len(raw) < 2000:
-            st.error("El fichero ha llegado vacío/incompleto. Vuelve a seleccionarlo desde Archivos/Descargas (no vista previa).")
+            st.error(
+                "El fichero no ha llegado correctamente (bytes insuficientes). "
+                "En móvil: guárdalo primero en Archivos/Descargas y selecciónalo desde ahí (no desde vista previa)."
+            )
             st.stop()
 
-        pet_df = read_petition_excel(raw)
+        # Leer excel
+        try:
+            pet_df = read_petition_excel(raw)
+        except Exception as e:
+            st.error("Error leyendo el Excel con `read_petition_excel()`.")
+            st.exception(e)
+            st.stop()
+
+        if pet_df is None or len(pet_df) == 0:
+            st.error("El Excel se ha leído pero no se obtienen filas útiles (posible tabla dinámica/cabecera rara).")
+            st.caption(f"Columnas detectadas: {list(getattr(pet_df, 'columns', []))}")
+            st.stop()
+
         matched, pending = match_petition_to_catalog(pet_df, idx_exact, idx_ref_color, idx_ref_talla, idx_ref)
 
         added_lines = 0
@@ -78,14 +108,14 @@ else:
         }
         st.success("Importación aplicada.")
 
-if st.session_state.last_import_stats:
+if st.session_state.get("last_import_stats"):
     s = st.session_state.last_import_stats
     m1, m2, m3 = st.columns(3)
     m1.metric("Líneas matcheadas", s["matched_lines"])
     m2.metric("Pendientes", s["pending_lines"])
     m3.metric("Líneas añadidas", s["added_lines"])
 
-if st.session_state.pending_rows:
+if st.session_state.get("pending_rows"):
     st.markdown("### Pendientes")
     st.dataframe(pd.DataFrame(st.session_state.pending_rows), use_container_width=True, hide_index=True)
 
