@@ -1,18 +1,11 @@
 # app.py
 import streamlit as st
-from utils import (
-    init_state,
-    ensure_style,
-    load_repo_data,
-    ORIGIN_OPTIONS,
-    DEST_OPTIONS,
-    warehouse_fmt,
-)
+import utils  # <-- IMPORTA EL MÓDULO, NO SÍMBOLOS SUELTOS
 
 st.set_page_config(page_title="Peticiones almacenes", page_icon="📦", layout="wide")
-ensure_style()
-init_state()
-load_repo_data()
+utils.ensure_style()
+utils.init_state()
+utils.load_repo_data()
 
 st.markdown("# 0 · Datos del pedido")
 st.markdown(
@@ -28,15 +21,37 @@ if not st.session_state.get("cat_loaded"):
     st.stop()
 
 # -----------------------------
+# Warehouses (fallback si no existe en utils)
+# -----------------------------
+WAREHOUSE_LABEL = getattr(
+    utils,
+    "WAREHOUSE_LABEL",
+    {
+        "BAD": "PET Almacén Badalona",
+        "IBI": "PET Almacén Ibiza",
+        "T001": "PET T001 · Tienda Ibiza",
+        "T002": "PET T002 · Tienda Marbella",
+        "T004": "PET T004 · Tienda Madrid",
+    },
+)
+
+def warehouse_fmt(code: str) -> str:
+    # usa el de utils si existe; si no, usa el fallback
+    fn = getattr(utils, "warehouse_fmt", None)
+    if callable(fn):
+        return fn(code)
+    return WAREHOUSE_LABEL.get(code, str(code))
+
+ORIGIN_OPTIONS = getattr(utils, "ORIGIN_OPTIONS", list(WAREHOUSE_LABEL.keys()))
+DEST_OPTIONS = getattr(utils, "DEST_OPTIONS", list(WAREHOUSE_LABEL.keys()))
+
+# -----------------------------
 # Cabecera del pedido
 # -----------------------------
 c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.2, 2.0])
 
 with c1:
-    st.session_state.fecha = st.date_input(
-        "Fecha",
-        value=st.session_state.fecha,
-    )
+    st.session_state.fecha = st.date_input("Fecha", value=st.session_state.fecha)
 
 with c2:
     st.session_state.origen = st.selectbox(
@@ -87,15 +102,5 @@ if st.session_state.get("tpl_bytes") is None:
 # Navegación
 # -----------------------------
 st.markdown("### Siguiente paso")
-
-st.page_link(
-    "pages/1_Importar_ventas_reposicion.py",
-    label="Continuar a 1 · Importar ventas/reposición →",
-    use_container_width=True,
-)
-
-st.page_link(
-    "pages/2_Seleccion_manual.py",
-    label="Saltar importación y pasar a 2 · Selección manual →",
-    use_container_width=True,
-)
+st.page_link("pages/1_Importar_ventas_reposicion.py", label="Continuar a 1 · Importar ventas/reposición →", use_container_width=True)
+st.page_link("pages/2_Seleccion_manual.py", label="Saltar importación y pasar a 2 · Selección manual →", use_container_width=True)
