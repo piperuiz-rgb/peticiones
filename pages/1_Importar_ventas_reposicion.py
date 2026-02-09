@@ -66,4 +66,5 @@ if st.session_state.pending_rows:
     st.dataframe(pd.DataFrame(st.session_state.pending_rows), use_container_width=True)
 
 st.markdown("<hr/>", unsafe_allow_html=True)
-st.info("Siguiente: ve a **2 · Selección manual** para ajustar con el grid.")
+st.page_link("pages/2_Seleccion_manual.py", label="Continuar a 2 · Selección manual →", use_container_width=True)
+st.page_link("app.py", label="← Volver a 0 · Datos del pedido", use_container_width=True)
