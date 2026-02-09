@@ -17,14 +17,26 @@ except Exception:
 # -----------------------------
 # Config & constants
 # -----------------------------
-ORIGIN_OPTIONS = [
-    "PET Almacén Badalona",
-    "ALM-CENTRAL",
+# utils.py
+
+WAREHOUSES = [
+    {"code": "BAD", "name": "PET Almacén Badalona"},
+    {"code": "IBI", "name": "PET Almacén Ibiza"},
+    {"code": "T001", "name": "PET T001 · Tienda Ibiza"},
+    {"code": "T002", "name": "PET T002 · Tienda Marbella"},
+    {"code": "T004", "name": "PET T004 · Tienda Madrid"},
 ]
-DEST_OPTIONS = [
-    "PET T002 Marbella",
-    "ALM-TIENDA",
-]
+
+# Mapa código -> nombre visible
+WAREHOUSE_LABEL = {w["code"]: w["name"] for w in WAREHOUSES}
+
+# Opciones internas (códigos)
+ORIGIN_OPTIONS = [w["code"] for w in WAREHOUSES]
+DEST_OPTIONS = [w["code"] for w in WAREHOUSES]
+
+def warehouse_fmt(code: str) -> str:
+    """Devuelve el nombre bonito del almacén para UI/export."""
+    return WAREHOUSE_LABEL.get(code, str(code))
 
 DEFAULT_CATALOG_PATH = "catalogue.xlsx"
 DEFAULT_TEMPLATE_PATH = "plantilla_pedido.xlsx"
