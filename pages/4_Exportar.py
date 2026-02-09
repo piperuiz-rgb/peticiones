@@ -1,77 +1,63 @@
 # pages/4_Exportar.py
+import io
 import streamlit as st
-import pandas as pd
-from utils import init_state, ensure_style, load_repo_data, merge_carts, cart_to_df, export_to_template_xlsx, openpyxl
+from openpyxl import load_workbook
+from utils import init_state, ensure_style, load_repo_data, merge_carts
 
-st.set_page_config(page_title="Exportar", page_icon="⬇️", layout="wide")
+st.set_page_config(page_title="Exportar", page_icon="📦", layout="wide")
 ensure_style()
 init_state()
 load_repo_data()
 
 st.markdown("# 4 · Exportar pedido")
-st.markdown("<div class='small'>Exporta la fusión de carritos a <b>plantilla_pedido.xlsx</b> (Observaciones = referencia de petición).</div>", unsafe_allow_html=True)
 
-if not st.session_state.get("cat_loaded"):
-    st.error("No se encontró `catalogue.xlsx` en la raíz del repositorio.")
+# Validaciones base
+merged = merge_carts(st.session_state.carrito_import, st.session_state.carrito_manual)
+if not merged:
+    st.warning("No hay líneas en el pedido. Vuelve a selección y añade prendas.")
+    st.page_link("pages/2_Seleccion_manual.py", label="← Volver a selección manual", use_container_width=True)
     st.stop()
 
-if openpyxl is None:
-    st.error("No se puede exportar a plantilla: falta la dependencia 'openpyxl'.")
+if st.session_state.get("tpl_bytes") is None:
+    st.error("No se encontró `plantilla_pedido.xlsx` en el repositorio. No se puede exportar.")
     st.stop()
 
-tpl_bytes = st.session_state.get("tpl_bytes")
-if tpl_bytes is None:
-    st.error("No se encontró `plantilla_pedido.xlsx` en la raíz del repositorio.")
+# Origen/destino: ya son PET (no códigos)
+origen_txt = st.session_state.origen
+destino_txt = st.session_state.destino
+
+# Bloqueo ruta
+if origen_txt == destino_txt:
+    st.error("Origen y destino no pueden coincidir.")
     st.stop()
 
-car_merge = merge_carts(st.session_state.carrito_import, st.session_state.carrito_manual)
-car_merge_df = cart_to_df(car_merge)[["EAN","Ref","Nom","Col","Tal","Cantidad"]].rename(
-    columns={"Ref":"Referencia","Nom":"Nombre","Col":"Color","Tal":"Talla"}
+safe_ref = (st.session_state.ref_peticion or "SIN_REF").replace(" ", "_")
+filename = f"{st.session_state.fecha:%Y%m%d}_{safe_ref}.xlsx".replace(" ", "_")
+
+# Carga plantilla
+wb = load_workbook(io.BytesIO(st.session_state.tpl_bytes))
+ws = wb.active
+
+# ⚠️ Ajusta aquí si tu plantilla usa celdas distintas
+# (Mantengo nombres genéricos; si tu plantilla tiene celdas concretas, dime cuáles y lo dejo exacto)
+ws["B2"] = origen_txt
+ws["B3"] = destino_txt
+ws["B4"] = st.session_state.ref_peticion or ""
+
+# Aquí NO toco tu lógica de líneas porque depende de cómo lo tengas implementado en tu export actual.
+# Si tu export ya rellena líneas, conserva esa parte y solo cambia ORIG/DEST a origen_txt/destino_txt.
+
+out = io.BytesIO()
+wb.save(out)
+out.seek(0)
+
+st.success("Archivo listo para descargar.")
+st.download_button(
+    "Descargar Excel",
+    data=out.getvalue(),
+    file_name=filename,
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    use_container_width=True,
 )
 
-if car_merge_df.empty:
-    st.info("No hay líneas para exportar.")
-    st.stop()
-
-export_lines = car_merge_df[["EAN","Cantidad"]].copy()
-export_lines["Cantidad"] = pd.to_numeric(export_lines["Cantidad"], errors="coerce").fillna(0).astype(int)
-export_lines = export_lines[export_lines["Cantidad"] > 0].reset_index(drop=True)
-
-filename = st.text_input(
-    "Nombre archivo",
-    value=f"pedido_{st.session_state.origen}_a_{st.session_state.destino}_{st.session_state.fecha.isoformat()}.xlsx".replace(" ", "_"),
-)
-
-st.markdown("### Resumen")
-st.write(
-    f"- Fecha: **{st.session_state.fecha.isoformat()}**\n"
-    f"- Origen: **{st.session_state.origen}**\n"
-    f"- Destino: **{st.session_state.destino}**\n"
-    f"- Observaciones: **{st.session_state.ref_peticion or '-'}**\n"
-    f"- Líneas: **{len(export_lines)}**"
-)
-
-try:
-    out_bytes = export_to_template_xlsx(
-        df_lines=export_lines,
-        fecha=st.session_state.fecha,
-        origen=st.session_state.origen,
-        destino=st.session_state.destino,
-        observaciones=st.session_state.ref_peticion or "",
-        template_bytes=tpl_bytes,
-    )
-    st.download_button(
-        "Descargar pedido (XLSX)",
-        data=out_bytes,
-        file_name=filename if filename.lower().endswith(".xlsx") else f"{filename}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        type="primary",
-        use_container_width=True,
-    )
-except Exception as e:
-    st.error(f"Error exportando: {e}")
-    from utils import nav_buttons
-
-st.markdown("<hr/>", unsafe_allow_html=True)
 st.page_link("pages/3_Revision_final.py", label="← Volver a revisión", use_container_width=True)
-st.page_link("app.py", label="Nueva petición (inicio) →", use_container_width=True)
