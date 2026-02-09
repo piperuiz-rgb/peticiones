@@ -19,20 +19,25 @@ except Exception:
 # -----------------------------
 # utils.py
 
+# =========================
+# Almacenes (códigos internos + nombre Odoo)
+# =========================
+
 WAREHOUSES = [
-    {"code": "BAD", "name": "PET Almacén Badalona"},
-    {"code": "IBI", "name": "PET Almacén Ibiza"},
-    {"code": "T001", "name": "PET T001 · Tienda Ibiza"},
-    {"code": "T002", "name": "PET T002 · Tienda Marbella"},
-    {"code": "T004", "name": "PET T004 · Tienda Madrid"},
+    {"code": "BAD",  "name": "PET Almacén Badalona"},
+    {"code": "IBI",  "name": "PET Almacén Ibiza"},
+    {"code": "T001", "name": "PET T001 Tienda Ibiza"},
+    {"code": "T002", "name": "PET T002 Tienda Marbella"},
+    {"code": "T004", "name": "PET T004 Tienda Madrid"},
 ]
 
-# Mapa código -> nombre visible
 WAREHOUSE_LABEL = {w["code"]: w["name"] for w in WAREHOUSES}
 
-# Opciones internas (códigos)
 ORIGIN_OPTIONS = [w["code"] for w in WAREHOUSES]
-DEST_OPTIONS = [w["code"] for w in WAREHOUSES]
+DEST_OPTIONS   = [w["code"] for w in WAREHOUSES]
+
+def warehouse_fmt(code: str) -> str:
+    return WAREHOUSE_LABEL.get(code, str(code))
 
 def warehouse_fmt(code: str) -> str:
     """Devuelve el nombre bonito del almacén para UI/export."""
