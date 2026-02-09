@@ -1,6 +1,6 @@
 # app.py
 import streamlit as st
-import utils  # no importes símbolos sueltos: evita ImportError
+import utils
 
 st.set_page_config(page_title="Peticiones almacenes", page_icon="📦", layout="wide")
 utils.ensure_style()
@@ -18,27 +18,17 @@ if not st.session_state.get("cat_loaded"):
     st.error("No se encontró **catalogue.xlsx** en la raíz del repositorio.")
     st.stop()
 
-# ✅ Lista cerrada definitiva (5 almacenes)
-WAREHOUSE_LABEL = {
-    "BAD": "PET Almacén Badalona",
-    "IBI": "PET Almacén Ibiza",
-    "T001": "PET T001 · Tienda Ibiza",
-    "T002": "PET T002 · Tienda Marbella",
-    "T004": "PET T004 · Tienda Madrid",
-}
-OPTIONS = list(WAREHOUSE_LABEL.keys())
+OPTIONS = utils.PET_WAREHOUSES
 
-def warehouse_fmt(code: str) -> str:
-    return WAREHOUSE_LABEL.get(code, str(code))
+# Normaliza valores antiguos (BAD/T002…) si existieran en session_state
+st.session_state["origen"] = utils.normalize_warehouse(st.session_state.get("origen", OPTIONS[0]))
+st.session_state["destino"] = utils.normalize_warehouse(st.session_state.get("destino", OPTIONS[1] if len(OPTIONS) > 1 else OPTIONS[0]))
 
-# Si venías de versiones anteriores con valores distintos, normalizamos
-if st.session_state.get("origen") not in OPTIONS:
-    st.session_state["origen"] = OPTIONS[0]
-if st.session_state.get("destino") not in OPTIONS:
-    st.session_state["destino"] = OPTIONS[1] if len(OPTIONS) > 1 else OPTIONS[0]
+# Asegura por defecto que no coincidan (evita “me quedo en esta página”)
+if st.session_state["origen"] == st.session_state["destino"] and len(OPTIONS) > 1:
+    st.session_state["destino"] = OPTIONS[1]
 
-# Cabecera del pedido
-c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.2, 2.0])
+c1, c2, c3, c4 = st.columns([1.2, 1.4, 1.4, 2.0])
 
 with c1:
     st.session_state.fecha = st.date_input("Fecha", value=st.session_state.fecha)
@@ -47,16 +37,14 @@ with c2:
     st.session_state.origen = st.selectbox(
         "Almacén de origen",
         OPTIONS,
-        index=OPTIONS.index(st.session_state.origen),
-        format_func=warehouse_fmt,
+        index=OPTIONS.index(st.session_state.origen) if st.session_state.origen in OPTIONS else 0,
     )
 
 with c3:
     st.session_state.destino = st.selectbox(
         "Almacén de destino",
         OPTIONS,
-        index=OPTIONS.index(st.session_state.destino),
-        format_func=warehouse_fmt,
+        index=OPTIONS.index(st.session_state.destino) if st.session_state.destino in OPTIONS else 1,
     )
 
 with c4:
@@ -80,7 +68,6 @@ if st.session_state.get("tpl_bytes") is None:
         "Podrás trabajar, pero no exportar."
     )
 
-# Navegación
 st.markdown("### Siguiente paso")
 st.page_link("pages/1_Importar_ventas_reposicion.py", label="Continuar a 1 · Importar ventas/reposición →", use_container_width=True)
 st.page_link("pages/2_Seleccion_manual.py", label="Saltar importación y pasar a 2 · Selección manual →", use_container_width=True)
