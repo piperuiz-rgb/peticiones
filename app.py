@@ -18,13 +18,31 @@ if not st.session_state.get("cat_loaded"):
     st.error("No se encontró **catalogue.xlsx** en la raíz del repositorio.")
     st.stop()
 
-OPTIONS = utils.PET_WAREHOUSES
+# ✅ Lista cerrada definitiva (solo nombres PET) con fallback
+OPTIONS = getattr(
+    utils,
+    "PET_WAREHOUSES",
+    [
+        "PET Almacén Badalona",
+        "PET Almacén Ibiza",
+        "PET T001 Tienda Ibiza",
+        "PET T002 Tienda Marbella",
+        "PET T004 Tienda Madrid",
+    ],
+)
 
-# Normaliza valores antiguos (BAD/T002…) si existieran en session_state
-st.session_state["origen"] = utils.normalize_warehouse(st.session_state.get("origen", OPTIONS[0]))
-st.session_state["destino"] = utils.normalize_warehouse(st.session_state.get("destino", OPTIONS[1] if len(OPTIONS) > 1 else OPTIONS[0]))
+def normalize_pet(value: str) -> str:
+    # si tienes normalize_warehouse en utils, úsala; si no, fallback
+    fn = getattr(utils, "normalize_warehouse", None)
+    if callable(fn):
+        return fn(value)
+    return value if value in OPTIONS else OPTIONS[0]
 
-# Asegura por defecto que no coincidan (evita “me quedo en esta página”)
+# Normaliza valores antiguos
+st.session_state["origen"] = normalize_pet(st.session_state.get("origen", OPTIONS[0]))
+st.session_state["destino"] = normalize_pet(st.session_state.get("destino", OPTIONS[1] if len(OPTIONS) > 1 else OPTIONS[0]))
+
+# evita por defecto que coincidan
 if st.session_state["origen"] == st.session_state["destino"] and len(OPTIONS) > 1:
     st.session_state["destino"] = OPTIONS[1]
 
@@ -44,7 +62,7 @@ with c3:
     st.session_state.destino = st.selectbox(
         "Almacén de destino",
         OPTIONS,
-        index=OPTIONS.index(st.session_state.destino) if st.session_state.destino in OPTIONS else 1,
+        index=OPTIONS.index(st.session_state.destino) if st.session_state.destino in OPTIONS else (1 if len(OPTIONS) > 1 else 0),
     )
 
 with c4:
