@@ -401,3 +401,32 @@ def nav_buttons(prev_page: str | None, next_page: str | None, next_label: str = 
     with c2:
         if next_page:
             st.page_link(next_page, label=next_label, use_container_width=True)
+# =========================
+# WAREHOUSES (solo nombres PET)
+# =========================
+
+PET_WAREHOUSES = [
+    "PET Almacén Badalona",
+    "PET Almacén Ibiza",
+    "PET T001 Tienda Ibiza",
+    "PET T002 Tienda Marbella",
+    "PET T004 Tienda Madrid",
+]
+
+# Si venías de códigos cortos antiguos, normalizamos a PET para no romper estados
+_PET_FROM_SHORT = {
+    "BAD": "PET Almacén Badalona",
+    "IBI": "PET Almacén Ibiza",
+    "T001": "PET T001 Tienda Ibiza",
+    "T002": "PET T002 Tienda Marbella",
+    "T004": "PET T004 Tienda Madrid",
+}
+
+def normalize_warehouse(value: str) -> str:
+    """Convierte códigos cortos antiguos a PET y valida contra lista cerrada."""
+    if value in _PET_FROM_SHORT:
+        return _PET_FROM_SHORT[value]
+    if value in PET_WAREHOUSES:
+        return value
+    # fallback seguro
+    return PET_WAREHOUSES[0]
